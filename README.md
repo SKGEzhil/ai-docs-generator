@@ -24,7 +24,7 @@ An intelligent FastAPI service that automatically generates comprehensive README
 
 1. **Clone the repository**:
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/SKGEzhil/ai-docs-generator
 cd ai_docs
 ```
 
@@ -121,7 +121,6 @@ ai_docs/
 │   ├── models.py              # Pydantic models
 │   ├── github_service.py      # GitHub API integration
 │   └── documentation_service.py # Documentation generation
-├── notebooks/                 # Original Jupyter notebooks
 ├── requirements.txt           # Python dependencies
 ├── .env.example              # Environment variables template
 └── README.md                 # This file
@@ -161,17 +160,7 @@ Once the server is running, visit:
 - **Interactive API docs**: http://localhost:8000/docs
 - **ReDoc documentation**: http://localhost:8000/redoc
 
-## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
 
 ## 🔗 Related Projects
 
