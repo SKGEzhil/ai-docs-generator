@@ -4,28 +4,26 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.documents import Document
-from langchain_openai import ChatOpenAI
 
-from .config import settings
+from src.config import settings
+from src.core.llm import llm
+from src.templates import templates
 
 class DocumentationService:
     """Service for generating documentation using RAG"""
 
     def __init__(self):
-        self.llm = ChatOpenAI(
-            model=settings.OPENAI_MODEL,
-            temperature=0.7,
-            api_key=settings.OPENAI_API_KEY,
-        )
+        self.llm = llm.get_model_info()
         self.embeddings = OpenAIEmbeddings(
             model="text-embedding-ada-002",
             api_key=settings.OPENAI_API_KEY
         )
 
-    def create_rag_index(self, file_objs: List[Dict[str, Any]], persist_directory: str = None) -> Chroma:
+    def create_rag_index(self, file_objs: List[Dict[str, Any]], repo_id: str) -> Chroma:
         """Create a RAG index from file metadata"""
-        if persist_directory is None:
-            persist_directory = settings.CHROMA_PERSIST_DIRECTORY
+
+        # Create new persist directory
+        persist_directory = "./chroma_repo_index/" + repo_id
 
         documents = []
 
@@ -139,27 +137,7 @@ Code: {example.get('code', 'None')}
 
     def generate_readme(self, file_objs: List[Dict[str, Any]], vectorstore: Chroma = None) -> str:
         """Generate README documentation"""
-        readme_template = {
-            "system": """
-You are an expert README file writer. You have been given complete JSON metadata for a codebase.
-
-Analyze the JSON metadata and generate a comprehensive README file that includes:
-1. **Project Overview**: A brief description of the project, its purpose, and main features.
-2. **Installation Instructions**: Step-by-step guide on how to install and set up the project.
-3. **Usage Examples**: Code snippets demonstrating how to use the main features of the project.
-4. **Technologies Used**: List of major libraries or technologies used in the project.
-5. **Features**: High-level features or responsibilities implemented in the project.
-
-Use emojis to enhance the readability and engagement of the README. For example:
-- Use 🚀 for installation instructions
-- Use 📚 for usage examples
-- Use 🛠️ for technologies used
-- Use ✨ for features
-
-Ensure the README is well-structured, easy to read, and follows best practices for documentation.
-""",
-            "human": "Generate the complete README now. Cover every file provided:\n\n{file_data}\n\nGenerate the documentation section now:"
-        }
+        readme_template = templates.readme_template
 
         return self._generate_docs_with_chunked_processing(
             file_objs, readme_template, vectorstore
@@ -167,41 +145,7 @@ Ensure the README is well-structured, easy to read, and follows best practices f
 
     def generate_api_docs(self, file_objs: List[Dict[str, Any]], vectorstore: Chroma = None) -> str:
         """Generate API documentation"""
-        api_docs_template = {
-            "system": """
-You are an expert documentation writer. Generate a Markdown documentation section for the provided files.
-Only use the information provided—do not hallucinate any endpoints, classes, functions, or parameters.
-
-Your output should include:
-
-1. **Module Sections**
-   For each file/module:
-   - **File path** (as a level‑2 heading: ## path/to/file.py)
-   - Module description from docstring
-
-2. **Classes**
-   Under each module (if any):
-   - Class name and base classes (level‑3 heading: ### ClassName)
-   - Class description
-   - Methods table:
-     | Method | Signature | Return Type | Description |
-     |--------|-----------|-------------|-------------|
-
-3. **Functions**
-   Under each module (if any):
-   - Function name (level‑3 heading: ### function_name())
-   - Function signature and description
-   - Parameters table:
-     | Name | Type | Default | Description |
-     |------|------|---------|-------------|
-
-4. **Examples**
-   If code examples exist, include them in fenced ```python blocks under an **Examples** subsection.
-
-Make sure your Markdown is clean and well‑formatted.
-""",
-            "human": "Generate documentation for these files. Cover every file provided:\n\n{file_data}\n\nGenerate the documentation section now:"
-        }
+        api_docs_template = templates.api_docs_template
 
         return self._generate_docs_with_chunked_processing(
             file_objs, api_docs_template, vectorstore
@@ -209,18 +153,10 @@ Make sure your Markdown is clean and well‑formatted.
 
     def generate_html_docs(self, markdown_content: str) -> str:
         """Convert markdown documentation to HTML"""
+        html_template = templates.html_template
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """
-You are an agent really good at HTML and CSS. You will be given markdown data. Your task is to convert this markdown data into a beautiful documentation page using HTML and CSS. 
-
-Requirements:
-1. Give only HTML data without any other texts
-2. Include a table of contents as sidebar
-3. Table of contents should have links to each file, class, and function in the documentation
-4. Use modern, clean CSS styling
-5. Make it responsive and professional looking
-"""),
-            ("human", "Convert this markdown data to HTML:\n\n{markdown_data}")
+            ("system", html_template["system"]),
+            ("human", html_template["human"]),
         ])
 
         messages = prompt.format_messages(markdown_data=markdown_content)
@@ -293,3 +229,13 @@ Requirements:
             documentation_parts.append(result.content)
 
         return "\n\n".join(documentation_parts)
+
+    def delete_rag_index(self, repo_id: str):
+        """Delete the RAG index directory"""
+        import shutil
+        try:
+            rag_path = "./chroma_repo_index/" + repo_id
+            shutil.rmtree(rag_path)
+            print(f"Deleted RAG index directory: {rag_path}")
+        except Exception as e:
+            print(f"Error deleting RAG index directory: {e}")

@@ -5,17 +5,6 @@ class GitHubRepoRequest(BaseModel):
     """Request model for GitHub repository analysis"""
     repo_id: str = Field(..., description="Repository identifier (e.g., 'owner/repo')")
 
-class DocumentationResponse(BaseModel):
-    """Response model for documentation generation"""
-    content: str = Field(..., description="Generated documentation content")
-    format: str = Field(..., description="Format of the documentation (markdown, html)")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-
-class ReadmeResponse(BaseModel):
-    """Response model for README generation"""
-    content: str = Field(..., description="Generated README content")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
-
 class ErrorResponse(BaseModel):
     """Error response model"""
     error: str = Field(..., description="Error message")

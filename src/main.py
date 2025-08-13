@@ -1,13 +1,14 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-import logging
-from typing import Dict, Any
-import json
+from fastapi.responses import PlainTextResponse
 
-from .models import GitHubRepoRequest, DocumentationResponse, ReadmeResponse, ErrorResponse
-from .github_service import GitHubService
-from .documentation_service import DocumentationService
+import logging
+
+from src.inference import Inference
+from .models import GitHubRepoRequest
+from src.services.github_service import GitHubService
+from src.services.documentation_service import DocumentationService
 from .config import settings
 
 # Configure logging
@@ -70,7 +71,7 @@ async def health_check():
         logger.error(f"Health check failed: {e}")
         raise HTTPException(status_code=503, detail="Service unhealthy")
 
-@app.post("/generate-readme", response_model=ReadmeResponse)
+@app.post("/generate-readme", response_class=PlainTextResponse)
 async def generate_readme(request: GitHubRepoRequest):
     """
     Generate a comprehensive README file for a GitHub repository
@@ -79,40 +80,9 @@ async def generate_readme(request: GitHubRepoRequest):
     """
     try:
         logger.info(f"Starting README generation for repository: {request.repo_id}")
-
-        # Step 1: Get file paths from repository
-        logger.info("Fetching repository file structure...")
-        file_paths = github_service.get_file_paths(request.repo_id)
-        logger.info(f"Found {len(file_paths)} relevant files")
-
-        # Step 2: Analyze project metadata
-        logger.info("Analyzing project metadata...")
-        project_metadata = github_service.analyze_project_metadata(file_paths)
-
-        # Step 3: Extract file metadata
-        logger.info("Extracting file metadata...")
-        file_metadata = github_service.extract_file_metadata(
-            request.repo_id, file_paths, project_metadata
-        )
-
-        # Step 4: Create RAG index
-        logger.info("Creating RAG index...")
-        vectorstore = doc_service.create_rag_index(file_metadata)
-
-        # Step 5: Generate README
-        logger.info("Generating README...")
-        readme_content = doc_service.generate_readme(file_metadata, vectorstore)
-
-        logger.info("README generation completed successfully")
-
-        return ReadmeResponse(
-            content=readme_content,
-            metadata={
-                "repo_id": request.repo_id,
-                "files_analyzed": len(file_metadata),
-                "project_metadata": json.loads(project_metadata) if project_metadata else None
-            }
-        )
+        inference = Inference(request.repo_id)
+        readme_content = inference.generate_readme()
+        return readme_content
 
     except Exception as e:
         logger.error(f"Error generating README for {request.repo_id}: {str(e)}")
@@ -121,7 +91,7 @@ async def generate_readme(request: GitHubRepoRequest):
             detail=f"Failed to generate README: {str(e)}"
         )
 
-@app.post("/generate-docs", response_model=DocumentationResponse)
+@app.post("/generate-docs", response_class=PlainTextResponse)
 async def generate_docs(request: GitHubRepoRequest):
     """
     Generate comprehensive API documentation for a GitHub repository
@@ -130,41 +100,9 @@ async def generate_docs(request: GitHubRepoRequest):
     """
     try:
         logger.info(f"Starting documentation generation for repository: {request.repo_id}")
-
-        # Step 1: Get file paths from repository
-        logger.info("Fetching repository file structure...")
-        file_paths = github_service.get_file_paths(request.repo_id)
-        logger.info(f"Found {len(file_paths)} relevant files")
-
-        # Step 2: Analyze project metadata
-        logger.info("Analyzing project metadata...")
-        project_metadata = github_service.analyze_project_metadata(file_paths)
-
-        # Step 3: Extract file metadata
-        logger.info("Extracting file metadata...")
-        file_metadata = github_service.extract_file_metadata(
-            request.repo_id, file_paths, project_metadata
-        )
-
-        # Step 4: Create RAG index
-        logger.info("Creating RAG index...")
-        vectorstore = doc_service.create_rag_index(file_metadata)
-
-        # Step 5: Generate API documentation
-        logger.info("Generating API documentation...")
-        api_docs = doc_service.generate_api_docs(file_metadata, vectorstore)
-
-        logger.info("Documentation generation completed successfully")
-
-        return DocumentationResponse(
-            content=api_docs,
-            format="markdown",
-            metadata={
-                "repo_id": request.repo_id,
-                "files_analyzed": len(file_metadata),
-                "project_metadata": json.loads(project_metadata) if project_metadata else None
-            }
-        )
+        inference = Inference(request.repo_id)
+        docs_content = inference.generate_docs()
+        return docs_content
 
     except Exception as e:
         logger.error(f"Error generating documentation for {request.repo_id}: {str(e)}")
@@ -183,36 +121,9 @@ async def generate_docs_html(request: GitHubRepoRequest):
     try:
         logger.info(f"Starting HTML documentation generation for repository: {request.repo_id}")
 
-        # Step 1: Get file paths from repository
-        logger.info("Fetching repository file structure...")
-        file_paths = github_service.get_file_paths(request.repo_id)
-        logger.info(f"Found {len(file_paths)} relevant files")
-
-        # Step 2: Analyze project metadata
-        logger.info("Analyzing project metadata...")
-        project_metadata = github_service.analyze_project_metadata(file_paths)
-
-        # Step 3: Extract file metadata
-        logger.info("Extracting file metadata...")
-        file_metadata = github_service.extract_file_metadata(
-            request.repo_id, file_paths, project_metadata
-        )
-
-        # Step 4: Create RAG index
-        logger.info("Creating RAG index...")
-        vectorstore = doc_service.create_rag_index(file_metadata)
-
-        # Step 5: Generate markdown documentation
-        logger.info("Generating markdown documentation...")
-        markdown_docs = doc_service.generate_api_docs(file_metadata, vectorstore)
-
-        # Step 6: Convert to HTML
-        logger.info("Converting to HTML...")
-        html_docs = doc_service.generate_html_docs(markdown_docs)
-
-        logger.info("HTML documentation generation completed successfully")
-
-        return HTMLResponse(content=html_docs)
+        inference = Inference(request.repo_id)
+        html_content = inference.generate_html_docs()
+        return html_content
 
     except Exception as e:
         logger.error(f"Error generating HTML documentation for {request.repo_id}: {str(e)}")
